@@ -394,22 +394,24 @@ void OctomapServer::insertScan(const tf::Point& sensorOriginTf, const PCLPointCl
     point3d point(it->x, it->y, it->z);
     // maxrange check
     if ((m_maxRange < 0.0) || ((point - sensorOrigin).norm() <= m_maxRange) ) {
+      // minrange check (ignore points if closer than the min range)
+      if ((point - sensorOrigin).norm() > 1.0){
+        // free cells
+        if (m_octree->computeRayKeys(sensorOrigin, point, m_keyRay)){
+          free_cells.insert(m_keyRay.begin(), m_keyRay.end());
+        }
+        // occupied endpoint
+        OcTreeKey key;
+        if (m_octree->coordToKeyChecked(point, key)){
+          occupied_cells.insert(key);
 
-      // free cells
-      if (m_octree->computeRayKeys(sensorOrigin, point, m_keyRay)){
-        free_cells.insert(m_keyRay.begin(), m_keyRay.end());
-      }
-      // occupied endpoint
-      OcTreeKey key;
-      if (m_octree->coordToKeyChecked(point, key)){
-        occupied_cells.insert(key);
-
-        updateMinKey(key, m_updateBBXMin);
-        updateMaxKey(key, m_updateBBXMax);
+          updateMinKey(key, m_updateBBXMin);
+          updateMaxKey(key, m_updateBBXMax);
 
 #ifdef COLOR_OCTOMAP_SERVER // NB: Only read and interpret color if it's an occupied node
-        m_octree->averageNodeColor(it->x, it->y, it->z, /*r=*/it->r, /*g=*/it->g, /*b=*/it->b);
+          m_octree->averageNodeColor(it->x, it->y, it->z, /*r=*/it->r, /*g=*/it->g, /*b=*/it->b);
 #endif
+        }
       }
     } else {// ray longer than maxrange:;
       point3d new_end = sensorOrigin + (point - sensorOrigin).normalized() * m_maxRange;
